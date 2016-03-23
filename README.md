@@ -14,6 +14,10 @@
 
 `npm i rnpm -g`
 
+## Clone This Repository
+
+`git clone https://github.com/syousif94/utbuses-rn.git`
+
 ## Install Dependencies and Link Maps Package
 
 `npm i && rnpm link`
