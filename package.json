@@ -1,0 +1,16 @@
+{
+  "name": "UTBuses",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "start": "node_modules/react-native/packager/packager.sh"
+  },
+  "dependencies": {
+    "firebase": "^2.4.1",
+    "geofire": "^4.0.0",
+    "geolib": "^2.0.20",
+    "polyline": "^0.2.0",
+    "react-native": "^0.21.0",
+    "react-native-maps": "^0.3.1"
+  }
+}
