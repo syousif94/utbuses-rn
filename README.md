@@ -1,8 +1,8 @@
 # UT Buses for Android
 
-![screenshot](https://i.imgur.com/py0xlid.png "Screenshot")
-
 [Play Store link](https://play.google.com/store/apps/details?id=com.utbuses&hl=en)
+
+![screenshot](https://i.imgur.com/py0xlid.png "Screenshot")
 
 # Set Up
 
