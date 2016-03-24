@@ -13,7 +13,6 @@ stops = [
   { latitude: 30.28972, longitude: -97.7388 },
   { latitude: 30.291657, longitude: -97.742835 },
   { latitude: 30.286032, longitude: -97.733433 },
-  { latitude: 30.283523, longitude: -97.739528 },
 ]
 
 export default stops
