@@ -84,11 +84,14 @@ android {
         applicationId "com.utbuses"
         minSdkVersion 16
         targetSdkVersion 22
-        versionCode 3
-        versionName "1.2"
+        versionCode 4
+        versionName "1.3"
         ndk {
             abiFilters "armeabi-v7a", "x86"
         }
+        manifestPlaceholders = [manifestApplicationId: "${applicationId}",
+            onesignal_app_id: "12a609a8-a7a8-4f68-ae7d-595ae9aa216e",
+            onesignal_google_project_number: "116044611041"]
     }
     signingConfigs {
         release {
@@ -133,4 +136,5 @@ dependencies {
     compile fileTree(dir: "libs", include: ["*.jar"])
     compile "com.android.support:appcompat-v7:23.0.1"
     compile "com.facebook.react:react-native:+"  // From node_modules
+    compile project(':react-native-onesignal')
 }

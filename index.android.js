@@ -1,15 +1,13 @@
-/**
- * Sample React Native App
- * https://github.com/facebook/react-native
- */
 'use strict';
 import React, {
+  AppState,
   AppRegistry,
   Component,
   StyleSheet,
   Text,
   View,
   TouchableOpacity,
+  ScrollView,
   Animated
 } from 'react-native';
 
@@ -19,6 +17,9 @@ import polyline from 'polyline'
 import Firebase from 'firebase'
 import GeoFire from 'geofire'
 import geolib from 'geolib'
+
+import StopList from './components/StopNotifications/StopList'
+import ToggleButton from './components/StopNotifications/ToggleButton'
 
 let annotations = new Map()
 const ref = new Firebase('https://utbusses.firebaseio.com')
@@ -59,6 +60,11 @@ function toArray(annotations) {
 class UTBuses extends Component {
   constructor() {
     super()
+    this.watchLocation = null
+    this.located = new Promise((resolve, reject) => {
+      this.resolveLocated = resolve
+    })
+    this.currentLocation = null
     this.undoInterval = null
     this.locationRef = null
     this.locationKey = null
@@ -68,7 +74,8 @@ class UTBuses extends Component {
       btn: 'update',
       annotations: [],
       poly: [],
-      time: Date.now()
+      time: Date.now(),
+      showStops: false,
     }
   }
 
@@ -84,6 +91,19 @@ class UTBuses extends Component {
     this.setState({
       poly: line
     })
+
+    AppState.addEventListener('change', this.onStateChange)
+
+    this.watchLocation = navigator.geolocation.watchPosition(
+      (position) => { 
+        if (!this.currentLocation) {
+          this.resolveLocated()
+        }
+        this.currentLocation = position 
+      },
+      (error) => console.log(error.message),
+      { enableHighAccuracy: true, maximumAge: 0 }
+    )
 
     var geoQuery = geoFire.query({
       center: [30.286390, -97.740726],
@@ -117,6 +137,28 @@ class UTBuses extends Component {
     }, 1000)
   }
 
+  onStateChange = (appState) => {
+    if (appState == 'background') {
+      navigator.geolocation.clearWatch(this.watchLocation)
+      this.currentLocation = null
+      this.watchLocation = null
+      this.located = new Promise((resolve, reject) => {
+        this.resolveLocated = resolve
+      })
+    } else if (appState == 'active') {
+      this.watchLocation = navigator.geolocation.watchPosition(
+        (position) => { 
+          if (!this.currentLocation) {
+            this.resolveLocated()
+          }
+          this.currentLocation = position 
+        },
+        (error) => console.log(error.message),
+        { enableHighAccuracy: true, maximumAge: 0 }
+      )
+    }
+  };
+
   renderPolyline = () => {
     if (this.state.poly.length) {
       return (
@@ -143,65 +185,64 @@ class UTBuses extends Component {
     this.setState({
       btn: 'locating'
     })
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        let nearby = stops.filter((stop) => {
-          const distance = geolib.getDistance( stop, position.coords )
-          return distance <= 60.69
+    this.located.then(() => {
+      let nearby = stops.filter((stop) => {
+        const distance = geolib.getDistance( stop, this.currentLocation.coords )
+        return distance <= 60.69
+      })
+      if (nearby.length) {
+        const stop = nearby[0]
+        const lat = this.currentLocation.coords.latitude
+        const lon = this.currentLocation.coords.longitude
+        this.locationRef = wcRef.push({
+          deviceTime: Date.now(),
+          timestamp: Firebase.ServerValue.TIMESTAMP,
+          stopName: stop.name,
+          stopId: stop.id
         })
-        if (nearby.length) {
-          const lat = position.coords.latitude
-          const lon = position.coords.longitude
-          this.locationRef = wcRef.push({
-            deviceTime: Date.now(),
-            timestamp: Firebase.ServerValue.TIMESTAMP
+        this.locationKey = this.locationRef.key()
+        this.setState({
+          btn: 'undo'
+        })
+        this.locationRef.then(() => {
+          geoFire.set(this.locationKey, [lat, lon]).then(() => {
+            this.undoInterval = setInterval(() => {
+              if (this.state.undoCountdown === 1) {
+                clearInterval(this.undoInterval)
+                this.setState({
+                  btn: 'update',
+                  undoCountdown: 5
+                })
+              } else {
+                this.setState({
+                  undoCountdown: this.state.undoCountdown - 1
+                })
+              }
+            }, 1000)
           })
-          this.locationKey = this.locationRef.key()
-          this.locationRef.then(() => {
-            geoFire.set(this.locationKey, [lat, lon]).then(() => {
-              this.setState({
-                btn: 'undo'
-              })
-              this.undoInterval = setInterval(() => {
-                if (this.state.undoCountdown === 1) {
-                  clearInterval(this.undoInterval)
-                  this.setState({
-                    btn: 'update',
-                    undoCountdown: 5
-                  })
-                } else {
-                  this.setState({
-                    undoCountdown: this.state.undoCountdown - 1
-                  })
-                }
-              }, 1000)
-            })
-          })
-        } else {
-          this.setState({
-            btn: 'update'
-          })
+        })
+      } else {
+        this.setState({
+          btn: 'update'
+        })
+        Animated.timing(
+          this.state.translateWarningBar,
+          {
+            toValue: 20,
+            duration: 500,
+          },
+        ).start(() => {
           Animated.timing(
             this.state.translateWarningBar,
             {
-              toValue: 20,
+              toValue: 0,
               duration: 500,
+              delay: 2000
             },
-          ).start(() => {
-            Animated.timing(
-              this.state.translateWarningBar,
-              {
-                toValue: 0,
-                duration: 500,
-                delay: 2000
-              },
-            ).start()
-          })
-        }
-      },
-      (error) => alert(error.message),
-      {enableHighAccuracy: true, timeout: 10000, maximumAge: 1000}
-    )
+          ).start()
+        })
+      }
+    })
   };
 
   renderBtn = () => {
@@ -209,7 +250,7 @@ class UTBuses extends Component {
       case 'undo':
         return (
           <TouchableOpacity onPress={this.undoLocation} style={styles.btn}>
-            <Text style={styles.undoText}>Undo Location Update</Text>
+            <Text style={styles.undoText}>Just kidding!</Text>
             <View style={styles.undoCountdown}>
               <Text style={styles.undoCountdownText}>{this.state.undoCountdown}</Text>
             </View>
@@ -226,11 +267,23 @@ class UTBuses extends Component {
       case 'update':
         return (
           <TouchableOpacity onPress={this.updateLocation} style={styles.btn}>
-            <Text style={styles.btnText}>I just got on the bus!</Text>
+            <Text style={styles.btnText}>The bus is here!</Text>
           </TouchableOpacity>
         )
         break
     }
+  };
+
+  showStops = () => {
+    this.setState({
+      showStops: true
+    })
+  };
+
+  hideStops = () => {
+    this.setState({
+      showStops: false
+    })
   };
 
   render() {
@@ -292,9 +345,18 @@ class UTBuses extends Component {
             )
           })} 
         </MapView>
+        <ToggleButton
+          showStops={this.state.showStops}
+          show={this.showStops}
+          hide={this.hideStops}
+        />
         <View style={styles.btnWrap}>
           { this.renderBtn() }
         </View>
+        <StopList 
+          stops={stops}
+          showStops={this.state.showStops}
+        />
         <Animated.View style={[styles.warningBar, { transform: [{translateY: this.state.translateWarningBar}] } ]}>
           <Text style={styles.warningText}>If you're within 200 feet of a stop, please try again.</Text>
         </Animated.View>
@@ -329,7 +391,7 @@ const styles = StyleSheet.create({
   btnWrap: {
     position: 'absolute',
     bottom: 25,
-    left: 25,
+    left: 85,
     right: 25,
     height: 50,
     backgroundColor: '#fff',

@@ -11,6 +11,7 @@
     "geolib": "^2.0.20",
     "polyline": "^0.2.0",
     "react-native": "^0.21.0",
-    "react-native-maps": "^0.3.1"
+    "react-native-maps": "^0.3.1",
+    "react-native-onesignal": "^1.1.1"
   }
 }
