@@ -8,7 +8,7 @@ import React, {
   View,
   TouchableOpacity,
   ScrollView,
-  Animated
+  Animated,
 } from 'react-native';
 
 import stops from './642stops'
@@ -20,6 +20,7 @@ import geolib from 'geolib'
 
 import StopList from './components/StopNotifications/StopList'
 import ToggleButton from './components/StopNotifications/ToggleButton'
+import BusMarker from './components/Markers/BusMarker'
 
 let annotations = new Map()
 const ref = new Firebase('https://utbusses.firebaseio.com')
@@ -76,6 +77,7 @@ class UTBuses extends Component {
       poly: [],
       time: Date.now(),
       showStops: false,
+      buses: []
     }
   }
 
@@ -112,7 +114,10 @@ class UTBuses extends Component {
 
     var onKeyEnter = geoQuery.on('key_entered', (key, location, distance) => {
       wcRef.child(key).once('value', (snapshot) => {
-        let { deviceTime, timestamp } = snapshot.val()
+        const val = snapshot.val()
+        if (!val) return
+        let { deviceTime, timestamp } = val
+        if (!deviceTime) return
         let marker = new annotation(key, location, deviceTime, timestamp)
         annotations.set(key, marker)
         let array = toArray(annotations)
@@ -135,7 +140,26 @@ class UTBuses extends Component {
         time: Date.now()
       })
     }, 1000)
+
+    this.getBusLocation()
+    setInterval(this.getBusLocation, 15000)
   }
+
+  getBusLocation = () => {
+    fetch('https://lnykjry6ze.execute-api.us-west-2.amazonaws.com/prod/gtfsrt-debug?url=https://data.texas.gov/download/eiei-9rpf/application/octet-stream')
+      .then(response => response.json())
+      .then(json => {
+        let vehicles = json.entity.filter((vehicle) => {
+          return vehicle.vehicle.trip.route_id == '642'
+        })
+        this.setState({
+          buses: vehicles
+        })
+      })
+      .catch(err => {
+        console.log(err)
+      })
+  };
 
   onStateChange = (appState) => {
     if (appState == 'background') {
@@ -311,11 +335,26 @@ class UTBuses extends Component {
               <MapView.Marker 
                 coordinate={stop} 
                 key={i}
-                anchor={{x: 0.5, y: 0.5}}>
+                anchor={{x: 0.105, y: 0.1}}>
                 <View style={styles.stop}/>
               </MapView.Marker>
             )
-          })} 
+          })}
+          {this.state.buses.map((bus, i) => {
+            const coords = {
+              latitude: bus.vehicle.position.latitude,
+              longitude: bus.vehicle.position.longitude,
+            }
+            return (
+              <MapView.Marker
+                anchor={{x: 0.2, y: 0.28}} 
+                coordinate={coords} 
+                key={bus.id}
+              >
+                <BusMarker bus={bus} time={this.state.time}/>
+              </MapView.Marker>
+            )
+          })}
           {this.state.annotations.map((annotation, i) => {
             let difference = this.state.time - annotation.time
             let min = difference / 60000
@@ -332,7 +371,8 @@ class UTBuses extends Component {
             let key = `${annotation.key}${bg}`
             return (
               <MapView.Marker 
-                coordinate={annotation.coords} 
+                coordinate={annotation.coords}
+                anchor={{x: 0.38, y: 0.46}}  
                 key={key}
               >
                 <View style={styles.update}>
@@ -343,7 +383,7 @@ class UTBuses extends Component {
                 </View>
               </MapView.Marker>
             )
-          })} 
+          })}
         </MapView>
         <ToggleButton
           showStops={this.state.showStops}
